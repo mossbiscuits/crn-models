@@ -19,7 +19,7 @@ reaction R2
     consume S2
     produce S0
     produce S4
-    const 1.0
+    const 0.1
 reaction R3
     consume S3
     consume S4
@@ -34,4 +34,4 @@ reaction R5
     consume S5
     produce S1
     produce S3
-    const 1.0
+    const 0.1
