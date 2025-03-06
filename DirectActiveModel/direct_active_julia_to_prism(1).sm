@@ -1,0 +1,257 @@
+// Direct activation reaction Julia code conversion
+
+ctmc
+
+const int MAX_AMOUNT = 100; // Default upper bound
+
+// Parameters:
+const double I_d = 4;
+const double r_p = 1.0 / 2400;  // RNA degradation rate constant
+const double r_m = 0.0067;      // RNA degradation rate
+const double s_A = 0.0;
+const double k_crF = 0.001848;  // Formation rate of dCas:gRNA complex
+const double k_crUF = 1.0 / 2400;  // Dissociation rate of dCas:gRNA complex
+const double k_crB = 0.0000483;  // Binding rate to DNA
+const double k_crunB = 1.0 / 2400;  // Unbinding rate from DNA
+const double k_J23101 = 0.019;  // Basal production rate from J23101
+const double k_J23117 = 0.0016;  // Basal production rate from J23117
+
+// dtet expression
+const double dtet_min = 0.0000931;
+const double dtet_max = 0.046;
+const double dtet_exp = 3.8;
+const double dtet_denom = pow(13, dtet_exp);
+
+formula dtet = dtet_min + (dtet_max - dtet_min) * 
+               (pow(I_d, dtet_exp) / (dtet_denom + pow(I_d, dtet_exp)));
+
+// dtac expression
+const double dtac_min = 0.0000912;
+const double dtac_max = 0.0627;
+const double dtac_exp = 1.8;
+const double dtac_denom = pow(140.6, dtac_exp);
+
+formula dtac = dtac_min + (dtac_max - dtac_min) * 
+               (pow(S_A, dtac_exp) / (dtac_denom + pow(S_A, dtac_exp)));
+
+// Reaction module
+module reactions
+
+    // Species initialization
+    G_d : [0..MAX_AMOUNT] init 9;       
+    md : [0..MAX_AMOUNT] init 0;        
+    d : [0..MAX_AMOUNT] init 0;         
+    S_A : [0..MAX_AMOUNT] init 40;     
+    g_Ap : [0..MAX_AMOUNT] init 0;    
+    g_An : [0..MAX_AMOUNT] init 0;  
+    c_Ap : [0..MAX_AMOUNT] init 0;    
+    c_An : [0..MAX_AMOUNT] init 0;    
+    D_A : [0..MAX_AMOUNT] init 40;      
+    C_Ap : [0..MAX_AMOUNT] init 0;     
+    C_An : [0..MAX_AMOUNT] init 0;     
+    C_Ap_An : [0..MAX_AMOUNT] init 0;   
+    g_Bp : [0..MAX_AMOUNT] init 0;    
+    c_Bp : [0..MAX_AMOUNT] init 0;    
+    g_Bn : [0..MAX_AMOUNT] init 0;    
+    c_Bn : [0..MAX_AMOUNT] init 0;   
+    D_B : [0..MAX_AMOUNT] init 40;   
+    C_Bp : [0..MAX_AMOUNT] init 0;     
+    C_Bn : [0..MAX_AMOUNT] init 0;    
+    C_Bp_Bn : [0..MAX_AMOUNT] init 0;   
+    g_Cp : [0..MAX_AMOUNT] init 0;      
+    c_Cp : [0..MAX_AMOUNT] init 0;      
+    g_Cn : [0..MAX_AMOUNT] init 0;      
+    c_Cn : [0..MAX_AMOUNT] init 0;     
+    D_C : [0..MAX_AMOUNT] init 40;      
+    C_Cp : [0..MAX_AMOUNT] init  0;     
+    C_Cn : [0..MAX_AMOUNT] init 0;      
+    C_Cp_Cn : [0..MAX_AMOUNT] init 0;   
+    m_C : [0..MAX_AMOUNT] init 0;       
+    Y_C : [0..MAX_AMOUNT] init 0;    
+    C_A_An : [0..MAX_AMOUNT] init 0;
+    C_A_Ap_An: [0..MAX_AMOUNT] init 0;
+
+   
+
+    // Reaction 1: G_d --> md + G_d
+    [reaction1] G_d > 0 & md < MAX_AMOUNT -> (dtet * G_d) : 
+              (md' = md + 1) & (G_d' = G_d);
+
+    // Reaction 2: md --> d + md
+    [reaction2] md > 0 & d < MAX_AMOUNT -> (3.59 * md) : 
+              (d' = d + 1);
+
+    // Reaction 3: d --> ∅ (degradation)
+    [reaction3] d > 0 -> (r_p * d) : 
+              (d' = d - 1);
+
+    // Reaction 4: md --> ∅ (degradation)
+    [reaction4] md > 0 -> (r_m * md) : 
+              (md' = md - 1);
+
+    // Reaction 5: S_A --> g_An + S_A
+    [reaction5] S_A > 0 & g_An < MAX_AMOUNT -> (dtac * S_A) : 
+              (g_An' = g_An + 1);
+
+    // Reaction 6: g_An --> ∅ (degradation)
+    [reaction6] g_An > 0 -> (r_m * g_An) : 
+              (g_An' = g_An - 1);
+
+    // Reaction 7: d + g_Ap --> c_Ap (complex formation)
+    [reaction7] d > 0 & g_Ap > 0 & c_Ap < MAX_AMOUNT -> 
+              (k_crF * d * g_Ap) : 
+              (c_Ap' = c_Ap + 1) & (d' = d - 1) & (g_Ap' = g_Ap - 1);
+
+    // Reaction 8: c_Ap --> d + g_Ap (complex dissociation)
+    [reaction8] c_Ap > 0 -> (k_crUF * c_Ap) : 
+              (c_Ap' = c_Ap - 1) & (d' = d + 1) & (g_Ap' = g_Ap + 1);
+
+    // Reaction 9: d + g_An --> c_An (complex formation)
+    [reaction9] d > 0 & g_An > 0 & c_An < MAX_AMOUNT -> 
+              (k_crF * d * g_An) : 
+              (c_An' = c_An + 1) & (d' = d - 1) & (g_An' = g_An - 1);
+
+    // Reaction 10: c_An --> d + g_An (complex dissociation)
+    [reaction10] c_An > 0 -> (k_crUF * c_An) : 
+              (c_An' = c_An - 1) & (d' = d + 1) & (g_An' = g_An + 1);
+
+    // Reaction 11: c_Ap + D_A --> C_Ap (complex formation)
+    // The rate is determined by the product of c_Ap and D_A.
+    [reaction11] c_Ap > 0 & D_A > 0 -> (k_crB * c_Ap * D_A) : 
+              (C_Ap' = C_Ap + 1) & (c_Ap' = c_Ap - 1) & (D_A' = D_A - 1);
+
+    // Reaction 12: C_Ap --> c_Ap + D_A (complex dissociation)
+    // The complex C_Ap dissociates into its components.
+    [reaction12] C_Ap > 0 -> (k_crunB * C_Ap) : 
+              (C_Ap' = C_Ap - 1) & (c_Ap' = c_Ap + 1) & (D_A' = D_A + 1);
+
+    // Reaction 13: c_An + D_A --> C_An (complex formation)
+    // The complex C_An is formed from c_An and D_A.
+    [reaction13] c_An > 0 & D_A > 0 -> (k_crB * c_An * D_A) : 
+              (C_An' = C_An + 1) & (c_An' = c_An - 1) & (D_A' = D_A - 1);
+
+    // Reaction 14: C_An --> c_An + D_A (complex dissociation)
+    // The complex C_An dissociates back into its components.
+    [reaction14] C_An > 0 -> (k_crunB * C_An) : 
+              (C_An' = C_An - 1) & (c_An' = c_An + 1) & (D_A' = D_A + 1);
+
+    // Reaction 15: c_An + C_Ap --> C_Ap_An (complex formation)
+    // The complex C_Ap_An is formed from c_An and C_Ap.
+    [reaction15] c_An > 0 & C_Ap > 0 -> (k_crB * c_An * C_Ap) : 
+              (C_Ap_An' = C_Ap_An + 1) & (c_An' = c_An - 1) & (C_Ap' = C_Ap - 1);
+
+    // Reaction 16: C_Ap_An --> c_An + C_Ap (complex dissociation)
+    // The complex C_Ap_An dissociates into c_An and C_Ap.
+    [reaction16] C_Ap_An > 0 -> (k_crunB * C_Ap_An) : 
+              (C_Ap_An' = C_Ap_An - 1) & (c_An' = c_An + 1) & (C_Ap' = C_Ap + 1);
+
+    // Reaction 17: c_Ap + C_An --> C_Ap_An (complex formation)
+    // The complex C_Ap_An is formed from c_Ap and C_An.
+    [reaction17] c_Ap > 0 & C_An > 0 -> (k_crB * c_Ap * C_An) : 
+              (C_Ap_An' = C_Ap_An + 1) & (c_Ap' = c_Ap - 1) & (C_An' = C_An - 1);
+
+    // Reaction 18: C_Ap_An --> c_Ap + C_An (complex dissociation)
+    // The complex C_Ap_An dissociates into c_Ap and C_An.
+    [reaction18] C_Ap_An > 0 -> (k_crunB * C_Ap_An) : 
+              (C_Ap_An' = C_Ap_An - 1) & (c_Ap' = c_Ap + 1) & (C_An' = C_An + 1);
+
+
+
+    // Reaction 19: D_A --> g_Cp + D_A (basal production)
+    [reaction19] D_A > 0 & g_Cp < MAX_AMOUNT -> 
+              (k_J23101 * D_A) : 
+              (g_Cp' = g_Cp + 1);
+
+    // Reaction 20: g_Cp --> ∅ (degradation)
+    [reaction20] g_Cp > 0 -> (r_m * g_Cp) : 
+              (g_Cp' = g_Cp - 1);
+
+    // Reaction 21: d + g_Cp --> c_Cp (complex formation)
+    [reaction21] d > 0 & g_Cp > 0 & c_Cp < MAX_AMOUNT -> 
+              (k_crF * d * g_Cp) : 
+              (c_Cp' = c_Cp + 1) & (d' = d - 1) & (g_Cp' = g_Cp - 1);
+
+    // Reaction 22: c_Cp --> d + g_Cp (complex dissociation)
+    [reaction22] c_Cp > 0 -> (k_crUF * c_Cp) : 
+              (c_Cp' = c_Cp - 1) & (d' = d + 1) & (g_Cp' = g_Cp + 1);
+
+    // Reaction 23: d + g_Cn --> c_Cn (complex formation)
+    [reaction23] d > 0 & g_Cn > 0 & c_Cn < MAX_AMOUNT -> 
+              (k_crF * d * g_Cn) : 
+              (c_Cn' = c_Cn + 1) & (d' = d - 1) & (g_Cn' = g_Cn - 1);
+
+    // Reaction 24: c_Cn --> d + g_Cn (complex dissociation)
+    [reaction24] c_Cn > 0 -> (k_crUF * c_Cn) : 
+              (c_Cn' = c_Cn - 1) & (d' = d + 1) & (g_Cn' = g_Cn + 1);
+
+    // Reaction 25: c_Cp + D_C --> C_Cp (complex formation)
+    [reaction25] c_Cp > 0 & D_C > 0 & C_Cp < MAX_AMOUNT -> 
+              (k_crB * c_Cp * D_C) : 
+              (C_Cp' = C_Cp + 1);
+
+    // Reaction 26: C_Cp --> c_Cp + D_C (complex dissociation)
+    [reaction26] C_Cp > 0 -> (k_crunB * C_Cp) : 
+              (C_Cp' = C_Cp - 1) & (D_C' = D_C + 1);
+
+    // Reaction 27: c_Cn + D_C --> C_Cn (complex formation)
+    [reaction27] c_Cn > 0 & D_C > 0 & C_Cn < MAX_AMOUNT -> 
+              (k_crB * c_Cn * D_C) : 
+              (C_Cn' = C_Cn + 1);
+
+    // Reaction 28: C_Cn --> c_Cn + D_C (complex dissociation)
+    [reaction28] C_Cn > 0 -> (k_crunB * C_Cn) : 
+              (C_Cn' = C_Cn - 1) & (D_C' = D_C + 1);
+
+    // Reaction 29: c_Cn + C_Cp --> C_Cp_Cn (complex formation)
+    [reaction29] c_Cn > 0 & C_Cp > 0 & C_Cp_Cn < MAX_AMOUNT -> 
+              (k_crB * c_Cn * C_Cp) : 
+              (C_Cp_Cn' = C_Cp_Cn + 1);
+
+    // Reaction 30: C_Cp_Cn --> c_Cn + C_Cp (complex dissociation)
+    [reaction30] C_Cp_Cn > 0 -> (k_crunB * C_Cp_Cn) : 
+              (C_Cp_Cn' = C_Cp_Cn - 1) & (c_Cn' = c_Cn + 1);
+
+    // Reaction 31: c_Cp + C_Cn --> C_Cp_Cn (complex formation)
+    [reaction31] c_Cp > 0 & C_Cn > 0 & C_Cp_Cn < MAX_AMOUNT -> 
+              (k_crB * c_Cp * C_Cn) : 
+              (C_Cp_Cn' = C_Cp_Cn + 1);
+
+    // Reaction 32: C_Cp_Cn --> c_Cp + C_Cn (complex dissociation)
+    [reaction32] C_Cp_Cn > 0 -> (k_crunB * C_Cp_Cn) : 
+              (C_Cp_Cn' = C_Cp_Cn - 1) & (c_Cp' = c_Cp + 1);
+
+    // Reaction 33: D_C --> m_C + D_C (basal production)
+    [reaction33] D_C > 0 & m_C < MAX_AMOUNT -> 
+              (k_J23117 * D_C) : 
+              (m_C' = m_C + 1);
+
+    // Reaction 34: C_Cp --> m_C + C_Cp
+    [reaction34] C_Cp > 0 & m_C < MAX_AMOUNT -> 
+              (22 * k_J23117) : 
+              (m_C' = m_C + 1);
+
+    // Reaction 35: C_Cp_Cn --> m_C + C_Cp_Cn
+    [reaction35] C_Cp_Cn > 0 & m_C < MAX_AMOUNT -> 
+              ((22.0 / 9.0) * k_J23117) : 
+              (m_C' = m_C + 1);
+
+    // Reaction 36: C_Cn --> m_C + C_Cn
+    [reaction36] C_Cn > 0 & m_C < MAX_AMOUNT -> 
+              ((1.0 / 9.0) * k_J23117) : 
+              (m_C' = m_C + 1);
+
+    // Reaction 37: m_C --> Y_C + m_C
+    [reaction37] m_C > 0 & Y_C < MAX_AMOUNT -> 
+              (1.22 * m_C) : 
+              (Y_C' = Y_C + 1);
+
+    // Reaction 38: m_C --> ∅ (degradation)
+    [reaction38] m_C > 0 -> (r_m * m_C) : 
+              (m_C' = m_C - 1);
+
+    // Reaction 39: Y_C --> ∅ (degradation)
+    [reaction39] Y_C > 0 -> (r_p * Y_C) : 
+              (Y_C' = Y_C - 1);
+
+endmodule
+
